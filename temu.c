@@ -22,14 +22,13 @@ static int inlinecode(char *st, char *en);
 static int links(char *st, char *en);
 static int replace(char *st, char *en);
 Parser parsers[] = {code, underlines, blockquotes, paragraphs, inlinecode, links, replace};
-char *fmts[] = {".jpg", ".jpeg", ".png", ".webp", ".gif"};
 
 int
 main(int argc, char **argv) {
 	FILE *s = stdin;
 	if(argc > 1) {
 	if(!(strcmp(argv[1], "-v")))
-		eprint(0, "muth v%s\n", VERSION);
+		eprint(0, "temu v%s\n", VERSION);
 	if(!(s = fopen(argv[1], "r")))
 		eprint(EXIT_FAILURE, "bad file\n");
 	}
@@ -81,10 +80,10 @@ static char
 		len += s;
 		if(BUFSIZE + len + 1 > bsize) {
 			bsize += BUFSIZE;
-			buf = emalloc(buf, bsize + 1);
+			buf = emalloc(buf, bsize);
 		}
 	}
-	strcpy(buf + len + 1, "\n\n\0");
+	strcpy(buf + len + 1, "\n\n");
 	return buf;
 }
 
@@ -153,7 +152,7 @@ underlines(char *st, char *en) {
 		fputs("\n</h1>\n", stdout);
 	} else if(c == '-') {
 		fputs("\n<h2>\n", stdout);
-		process(st + 1, st + l, (Parser[]){inlinecode, replace});
+		process(st + 1, st + l, (Parser[]){inlinecode, replace, NULL});
 		fputs("\n</h2>\n", stdout);
 	}
 
@@ -176,7 +175,7 @@ blockquotes(char *st, char *en) {
 		return 0;
 	
 	fputs("<blockquote>\n", stdout); /* intentionally missing leading \n */
-	process(st + 1, p, (Parser[]){inlinecode, replace, NULL});
+	process(st + 1, p, (Parser[]){inlinecode, links, replace, NULL});
 	fputs("\n</blockquote>\n", stdout);
 	return (p - st) + 1;
 }
@@ -224,7 +223,7 @@ links(char *st, char *en) {
 	char *c, *buf, *p = st;
 	
 	for(; p < en; p++) {
-		if(p[0] == '\n' || p[0] == ' ')
+		if(p[0] == '\n' || p[0] == ' ' || p[0] == '\t')
 			return 0;
 		if(p[0] == '!' || p[0] == ':') {
 			c = p;
@@ -250,6 +249,7 @@ links(char *st, char *en) {
 		printf("<img src=\"%s\">", buf);
 	else
 		printf("<a href=\"%s\">%s</a>", buf, buf);
+	free(buf);
 	return (p - st);
 }
 
