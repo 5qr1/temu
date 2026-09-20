@@ -1,21 +1,16 @@
 .POSIX:
 .PHONY: all install uninstall clean
 
-VERSION = 0.5
+VERSION = 1.0
 
 PREFIX = /usr/local
 CC = cc
 CFLAGS = -Wall -Wextra -DVERSION=\"$(VERSION)\"
-LDLIBS = -lm
 
-all: muth
-install: muth
-	cp -f muth $(DESTDIR)/$(PREFIX)/bin
-
+all: temu
+install: all
+	cp -f temu $(DESTDIR)/$(PREFIX)/bin
 uninstall:
-	rm -f $(DESTDIR)/$(PREFIX)/bin/muth
-
-muth: muth.c
-
+	rm -f $(DESTDIR)/$(PREFIX)/bin/temu
 clean:
-	rm -f muth muth.core muth.o a.out
+	rm -f temu temu.core temu.o a.out

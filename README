@@ -1,8 +1,35 @@
-muth: markup to html
-====================
+temu; teensy eensy markup language
+==================================
 
-muth is a tiny (~187 sloc!) markup to html converter written in C
-muth supports only setext style headings and a <custom.link|format> which works for <images.jpg> too! it does not concern itself with commonmark or compatibility with other formats
+temu (teensy eensy markup language; or temu markdown) is a lightweight markup 
+language designed to be as close to a .txt file as possible. provided is a 
+converter from temu to html, written in c for POSIX systems
+
+temu features
+-------------
+
+the heading you just read is a feature. lines underlined with hyphens are
+converted to h2s, and lines underlined with equals are converted to h1s.
+
+we have `code!` it supports both inline and
+
+`not
+
+inline!`
+
+we also have
+	blockquotes! you can add a tab before your paragraph to make it a
+	blockquote instead of a paragraph. not every line of the blockquote
+	has to be tab indented, although they can be,
+	it does mean that there must be whitespace between a tab indented
+	line and a line intended not to be,
+
+like this.
+
+we also have https://links.faketld ! hyperlinks (currently) arent supported.
+you can link to a file on your own website like ://file.txt , and you can
+make the link be wrapped in an <img> by replacing the colon with a !, like
+https!//en.topreism.org/itm/ND01N0top.png .
 
 licensed under WTFPL :- )
 -------------------------

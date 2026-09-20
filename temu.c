@@ -1,4 +1,4 @@
-/*muth: markup to html
+/*temu: teensy eensy markup language
  (c) 5qr1 WTFPL 2026 */
 
 #include <stdio.h>
@@ -13,7 +13,7 @@ typedef int (*Parser)(char *, char *);
 static void eprint(int err, const char *fmt, ...);
 static void *emalloc(void *in, size_t n);
 static char *lfiletobuf(FILE *in);
-static void process(char *st, char *en, Parser parser);
+static void process(char *st, char *en, Parser pl[]);
 static int code(char *st, char *en);
 static int underlines(char *st, char *en);
 static int blockquotes(char *st, char *en);
@@ -81,25 +81,26 @@ static char
 		len += s;
 		if(BUFSIZE + len + 1 > bsize) {
 			bsize += BUFSIZE;
-			buf = emalloc(buf, bsize);
+			buf = emalloc(buf, bsize + 1);
 		}
 	}
-	strcpy(buf + len + 1, "\n\0");
+	strcpy(buf + len + 1, "\n\n\0");
 	return buf;
 }
 
 static void
-process(char *st, char *en, Parser parser) {
+process(char *st, char *en, Parser pl[]) {
 	if(!(st) || !(en))
 		return;
 	
 	for(char *p = st; p < en; p++) {
 		int ch = 0;
-		if(!parser)
+		if(pl)
+			for(size_t i = 0; pl[i] != NULL && !ch; i++)
+				ch = pl[i](p, en);
+		else 
 			for(size_t i = 0; i < LENGTH(parsers) && !ch; i++)
 				ch = parsers[i](p, en);
-		else
-			ch = parser(p, en);
 		if(ch)
 			p += ch - 1;
 		else
@@ -117,9 +118,9 @@ code(char *st, char *en) {
 	if(p >= en)
 		return 0;
 
-	printf("<pre><code>");
-	process(st + 2, p, replace);
-	printf("</code></pre>");
+	fputs("\n<pre><code>\n", stdout);
+	process(st + 2, p, (Parser[]){replace, NULL});
+	fputs("\n</code></pre>", stdout);
 	return (p - st) + 1;
 }
 
@@ -147,13 +148,13 @@ underlines(char *st, char *en) {
 		return 0;
 
 	if(c == '=') {
-		printf("<h1>");
-		process(st + 1, st + l, 0);
-		printf("</h1>\n");
+		fputs("\n<h1>\n", stdout);
+		process(st + 1, st + l, (Parser[]){inlinecode, replace, NULL});
+		fputs("\n</h1>\n", stdout);
 	} else if(c == '-') {
-		printf("<h2>");
-		process(st + 1, st + l, 0);
-		printf("</h2>\n");
+		fputs("\n<h2>\n", stdout);
+		process(st + 1, st + l, (Parser[]){inlinecode, replace});
+		fputs("\n</h2>\n", stdout);
 	}
 
 	if((en - p) > 2 && p[1] == '\n')
@@ -166,32 +167,39 @@ static int
 blockquotes(char *st, char *en) {
 	if(!(st) || st[0] != '\n' || st[1] != '\t')
 		return 0;
-	
 	char *p = st + 1;
-	for(;p < en && p[0] != '\n'; p++);
-	if(p[0] != '\n')
+
+	for(;p < en; p++)
+		if(p[0] == '\n' && p[1] == '\n')
+			break;
+	if(!p || p >= en)
 		return 0;
 	
-	printf("<blockquote>");
-	process(st + 1, p, 0);
-	printf("</blockquote>\n");
-	return (p - st);
+	fputs("<blockquote>\n", stdout); /* intentionally missing leading \n */
+	process(st + 1, p, (Parser[]){inlinecode, replace, NULL});
+	fputs("\n</blockquote>\n", stdout);
+	return (p - st) + 1;
 }
 
 static int
 paragraphs(char *st, char *en) {
 	if(!(st) || st[0] != '\n' || st[1] == '\n')
 		return 0;
-	
 	char *p = st + 1;
-	for(;p < en && p[0] != '\n'; p++);
-	if(p[0] != '\n')
+
+	for(; p < en; p++)
+		if((p[0] == '\n' && p[1] == '\n') || (p[0] == '\n' && p[1] == '\t'))
+			break;
+	if(!p || p >= en)
 		return 0;
-	
-	printf("<p>");
-	process(st + 1, p, 0);
-	printf("</p>\n");
-	return (p - st);
+
+	fputs("\n<p>\n", stdout);
+	process(st + 1, p, (Parser[]){inlinecode, links, replace, NULL});
+	fputs("\n</p>\n", stdout);
+
+	if(p[1] == '\t')
+		return p - st;
+	return (p - st) + 1;
 }
 
 static int
@@ -204,47 +212,45 @@ inlinecode(char *st, char *en) {
 	if(p >= en)
 		return 0;
 
-	printf("<code>");
-	process(st + 1, p, replace);
-	printf("</code>");
+	fputs("<code>", stdout);
+	process(st + 1, p, (Parser[]){replace, NULL});
+	fputs("</code>", stdout);
 	return (p - st) + 1;
 }
 
+/* todo: make less sloppy */
 static int
 links(char *st, char *en) {
-	if(!(st) || st[0] != '<')
+	char *c, *buf, *p = st;
+	
+	for(; p < en; p++) {
+		if(p[0] == '\n' || p[0] == ' ')
+			return 0;
+		if(p[0] == '!' || p[0] == ':') {
+			c = p;
+			break;
+		}
+	} if(p + 3 >= en || p[1] != '/' || p[2] != '/')
 		return 0;
+	for(p += 2; p < en && p[0] != '\n' && p[0] != ' '; p++);
 	
-	char *p = st + 1;
-	for(;p < en && p[0] != '>'; p++);
-	if(p >= en) 
-		return 0;
-	
-	char *buf = emalloc(NULL, (p - st)), *h;
-	memcpy(buf, st + 1, (p - st - 1));
-	buf[p - st - 1] = '\0';
-
-	strtok(buf, "|");
-	h = strtok(NULL, "|");
-	
-	char *img = 0;
-	for(size_t i = 0; i < LENGTH(fmts) && !img; i++)
-		img = strstr(buf, fmts[i]);
-
-	if(img) {
-		if(h)
-			printf("<a href=\"%s\"><img src=\"%s\"></a>", h, buf);
-		else
-			printf("<img src=\"%s\">", buf);
+	if(c == st) {
+		buf = emalloc(NULL, (p - (c + 3)));
+		memcpy(buf, c + 3, (p - (c + 3)));
+		buf[(p - (c + 3))] = '\0';
 	} else {
-		if(h)
-			printf("<a href=\"%s\">%s</a>", buf, h);
-		else	
-			printf("<a href=\"%s\">%s</a>", buf, buf);
+		buf = emalloc(NULL, (p - st));
+		memcpy(buf, st, p - st);
+		buf[(p - st)] = '\0';
+		if(c[0] == '!')
+			buf[c - st] = ':';
 	}
 
-	free(buf);
-	return (p - st) + 1;
+	if(c[0] == '!')
+		printf("<img src=\"%s\">", buf);
+	else
+		printf("<a href=\"%s\">%s</a>", buf, buf);
+	return (p - st);
 }
 
 static int
@@ -253,19 +259,22 @@ replace(char *st, char *en) {
 		return 0;
 	switch(st[0]) {
 		case '&':
-			printf("&amp;");
+			fputs("&amp;", stdout);
 			return 1;
 		case '<':
-			printf("&lt;");
+			fputs("&lt;", stdout);
 			return 1;
 		case '>':
-			printf("&gt;");
+			fputs("&gt;", stdout);
 			return 1;
 		case '\"':
-			printf("&quot;");
+			fputs("&quot;", stdout);
 			return 1;
 		case '\'':
-			printf("&#39;");
+			fputs("&#39;", stdout);
+			return 1;
+		case '\t':
+			/*putc(' ', stdout);*/
 			return 1;
 		default:
 			return 0;
