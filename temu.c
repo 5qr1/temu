@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#ifdef __OpenBSD__
+#include <unistd.h>
+#endif
 
 #define LENGTH(x) sizeof(x)/sizeof(x[0])
 #define BUFSIZE 2048
@@ -33,6 +36,11 @@ main(int argc, char **argv) {
 		eprint(EXIT_FAILURE, "bad file\n");
 	}
 	
+	#ifdef __OpenBSD__
+	if(unveil(NULL, NULL) == -1 || pledge("stdio", NULL) == -1)
+		eprint(1, "pledge/unveil failed/n");
+	#endif	
+
 	char *buf = lfiletobuf(s);
 	process(buf, &buf[strlen(buf)], 0);
 
